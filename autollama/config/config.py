@@ -3,9 +3,10 @@ import os
 from typing import List
 import yaml
 from colorama import Fore
-
+from dotenv import load_dotenv
 from autollama.singleton import Singleton
 
+load_dotenv()
 
 class Config(metaclass=Singleton):
     """
@@ -31,7 +32,7 @@ class Config(metaclass=Singleton):
         self.embedding_token_limit = int(os.getenv("EMBEDDING_TOKEN_LIMIT", 8191))
         self.browse_chunk_max_length = int(os.getenv("BROWSE_CHUNK_MAX_LENGTH", 3000))
 
-        self.groq_api_key = "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"
+        self.groq_api_key = os.getenv("GROQ_API_KEY")
         self.temperature = float(os.getenv("TEMPERATURE", "0"))
         self.execute_local_commands = (
             os.getenv("EXECUTE_LOCAL_COMMANDS", "False") == "True"
