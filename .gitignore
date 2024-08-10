@@ -6,3 +6,12 @@ __pycache__/
 
 # Ignore the virtual environment directory
 autollamaenv/
+
+# Ignore logs directory
+logs/
+
+# Ignore ai_settings.yaml file
+ai_settings.yaml
+
+# Ignore auto_llama_workspace directory
+auto_llama_workspace/
