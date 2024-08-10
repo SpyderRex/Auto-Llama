@@ -1,0 +1,8 @@
+# Ignore __pycache__ directories
+__pycache__/
+
+# Ignore environment files
+.env
+
+# Ignore the virtual environment directory
+autollamaenv/

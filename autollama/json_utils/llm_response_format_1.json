@@ -1,0 +1,30 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "thoughts": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string"},
+                "reasoning": {"type": "string"},
+                "plan": {"type": "array"},
+                "criticism": {"type": "string"}
+            },
+            "required": ["text", "reasoning", "plan", "criticism"],
+            "additionalProperties": false
+        },
+        "command": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "args": {
+                    "type": "object"
+                }
+            },
+            "required": ["name", "args"],
+            "additionalProperties": false
+        }
+    },
+    "required": ["thoughts", "command"],
+    "additionalProperties": false
+}
