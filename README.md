@@ -22,8 +22,8 @@ python3 --version
 ### Installation
 1. Clone the Repository:
 ```bash
-git clone https://github.com/yourusername/autollama.git
-cd autollama
+git clone https://github.com/SpyderRex/Auto-Llama.git
+cd Auto-Llama
 ```
 
 2. Install the Requirements:
