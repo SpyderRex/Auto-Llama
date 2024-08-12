@@ -1,21 +1,8 @@
-"""
-=========
-Workspace
-=========
-
-The workspace is a directory containing configuration and working files for an AutoLlama
-agent.
-
-"""
-from __future__ import annotations
-
 from pathlib import Path
-
 from autollama.logs import logger
 
-
 class Workspace:
-    """A class that represents a workspace for an AutoGPT agent."""
+    """A class that represents a workspace for an AutoLlama agent."""
 
     NULL_BYTES = ["\0", "\000", "\x00", r"\z", "\u0000", "%00"]
 
@@ -48,9 +35,9 @@ class Workspace:
             The path to the workspace directory.
 
         """
-        # TODO: have this make the env file and ai settings file in the directory.
         workspace_directory = cls._sanitize_path(workspace_directory)
         workspace_directory.mkdir(exist_ok=True, parents=True)
+        logger.info(f"Workspace directory created at: {workspace_directory}")
         return workspace_directory
 
     def get_path(self, relative_path: str | Path) -> Path:
@@ -67,11 +54,13 @@ class Workspace:
             The resolved path relative to the workspace.
 
         """
-        return self._sanitize_path(
+        resolved_path = self._sanitize_path(
             relative_path,
             root=self.root,
             restrict_to_root=self.restrict_to_workspace,
         )
+        logger.debug(f"Resolved path: {resolved_path}")
+        return resolved_path
 
     @staticmethod
     def _sanitize_path(
@@ -103,10 +92,6 @@ class Workspace:
             If the path is outside the root and the root is restricted.
 
         """
-
-        # Posix systems disallow null bytes in paths. Windows is agnostic about it.
-        # Do an explicit check here for all sorts of null byte representations.
-
         for null_byte in Workspace.NULL_BYTES:
             if null_byte in str(relative_path) or null_byte in str(root):
                 raise ValueError("embedded null byte")
@@ -114,11 +99,11 @@ class Workspace:
         if root is None:
             return Path(relative_path).resolve()
 
-        logger.debug(f"Resolving path '{relative_path}' in workspace '{root}'")
+        logger.debug(f"Sanitizing path '{relative_path}' with root '{root}'")
 
         root, relative_path = Path(root).resolve(), Path(relative_path)
 
-        logger.debug(f"Resolved root as '{root}'")
+        logger.debug(f"Sanitized root as '{root}'")
 
         if relative_path.is_absolute():
             raise ValueError(
@@ -127,7 +112,7 @@ class Workspace:
 
         full_path = root.joinpath(relative_path).resolve()
 
-        logger.debug(f"Joined paths as '{full_path}'")
+        logger.debug(f"Sanitized path as '{full_path}'")
 
         if restrict_to_root and not full_path.is_relative_to(root):
             raise ValueError(

@@ -8,8 +8,8 @@ from typing import Dict, Generator, Literal, Tuple
 
 import charset_normalizer
 import requests
-from colorama import Back, Fore
 from requests.adapters import HTTPAdapter, Retry
+from colorama import Back, Fore
 
 from autollama.commands.command import command
 from autollama.config import Config
@@ -30,26 +30,23 @@ def text_checksum(text: str) -> str:
 def operations_from_log(log_path: str) -> Generator[Tuple[Operation, str, str | None]]:
     """Parse the file operations log and return a tuple containing the log entries"""
     try:
-        log = open(log_path, "r", encoding="utf-8")
+        with open(log_path, "r", encoding="utf-8") as log:
+            for line in log:
+                line = line.replace("File Operation Logger", "").strip()
+                if not line:
+                    continue
+                operation, tail = line.split(": ", maxsplit=1)
+                operation = operation.strip()
+                if operation in ("write", "append"):
+                    try:
+                        path, checksum = (x.strip() for x in tail.rsplit(" #", maxsplit=1))
+                    except ValueError:
+                        path, checksum = tail.strip(), None
+                    yield (operation, path, checksum)
+                elif operation == "delete":
+                    yield (operation, tail.strip(), None)
     except FileNotFoundError:
         return
-
-    for line in log:
-        line = line.replace("File Operation Logger", "").strip()
-        if not line:
-            continue
-        operation, tail = line.split(": ", maxsplit=1)
-        operation = operation.strip()
-        if operation in ("write", "append"):
-            try:
-                path, checksum = (x.strip() for x in tail.rsplit(" #", maxsplit=1))
-            except ValueError:
-                path, checksum = tail.strip(), None
-            yield (operation, path, checksum)
-        elif operation == "delete":
-            yield (operation, tail.strip(), None)
-
-    log.close()
 
 
 def file_operations_state(log_path: str) -> Dict:
@@ -71,7 +68,8 @@ def file_operations_state(log_path: str) -> Dict:
         if operation in ("write", "append"):
             state[path] = checksum
         elif operation == "delete":
-            del state[path]
+            if path in state:
+                del state[path]
     return state
 
 
@@ -154,11 +152,16 @@ def read_file(filename: str) -> str:
         str: The contents of the file
     """
     try:
+        # Ensure the filename is relative to the workspace
+        if not os.path.isabs(filename):
+            filename = os.path.join(CFG.workspace_path, filename)
+        
         charset_match = charset_normalizer.from_path(filename).best()
         encoding = charset_match.encoding
         logger.debug(f"Read file '{filename}' with encoding '{encoding}'")
         return str(charset_match)
     except Exception as err:
+        logger.error(f"Error reading file {filename}: {err}")
         return f"Error: {err}"
 
 
@@ -193,7 +196,7 @@ def ingest_file(
 
         logger.info(f"Done ingesting {num_chunks} chunks from {filename}.")
     except Exception as err:
-        logger.info(f"Error while ingesting file '{filename}': {err}")
+        logger.error(f"Error while ingesting file '{filename}': {err}")
 
 
 @command("write_to_file", "Write to file", '"filename": "<filename>", "text": "<text>"')
@@ -211,6 +214,10 @@ def write_to_file(filename: str, text: str) -> str:
     if is_duplicate_operation("write", filename, checksum):
         return "Error: File has already been updated."
     try:
+        # Ensure the filename is relative to the workspace
+        if not os.path.isabs(filename):
+            filename = os.path.join(CFG.workspace_path, filename)
+
         directory = os.path.dirname(filename)
         os.makedirs(directory, exist_ok=True)
         with open(filename, "w", encoding="utf-8") as f:
@@ -218,6 +225,7 @@ def write_to_file(filename: str, text: str) -> str:
         log_operation("write", filename, checksum)
         return "File written to successfully."
     except Exception as err:
+        logger.error(f"Failed to write to file {filename}. Error: {err}")
         return f"Error: {err}"
 
 

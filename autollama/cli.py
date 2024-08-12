@@ -1,51 +1,42 @@
 """Main script for the autollama package."""
 import click
 
-
 @click.group(invoke_without_command=True)
 @click.option("-c", "--continuous", is_flag=True, help="Enable Continuous Mode")
 @click.option(
-    "--skip-reprompt",
-    "-y",
+    "-y", "--skip-reprompt",
     is_flag=True,
-    help="Skips the re-prompting messages at the beginning of the script",
+    help="Skip initial re-prompt messages"
 )
 @click.option(
-    "--ai-settings",
-    "-C",
-    help="Specifies which ai_settings.yaml file to use, will also automatically skip the re-prompt.",
+    "-C", "--ai-settings",
+    help="Specify the ai_settings.yaml file to use (automatically skips re-prompt)"
 )
 @click.option(
-    "-l",
-    "--continuous-limit",
+    "-l", "--continuous-limit",
     type=int,
-    help="Defines the number of times to run in continuous mode",
+    help="Number of times to run in continuous mode"
 )
 @click.option("--debug", is_flag=True, help="Enable Debug Mode")
 @click.option(
-    "--use-memory",
-    "-m",
-    "memory_type",
+    "-m", "--use-memory", "memory_type",
     type=str,
-    help="Defines which Memory backend to use",
+    help="Define which Memory backend to use"
 )
 @click.option(
-    "-b",
-    "--browser-name",
-    help="Specifies which web-browser to use when using selenium to scrape the web.",
+    "-b", "--browser-name",
+    help="Specify the web-browser to use with selenium"
 )
 @click.option(
     "--allow-downloads",
     is_flag=True,
-    help="Dangerous: Allows Auto-Llama to download files natively.",
+    help="Dangerous: Allow Auto-Llama to download files natively"
 )
 @click.option(
-    # TODO: this is a hidden option for now, necessary for integration testing.
-    #   We should make this public once we're ready to roll out agent specific workspaces.
-    "--workspace-directory",
-    "-w",
+    "-w", "--workspace-directory",
     type=click.Path(),
     hidden=True,
+    help="(Hidden) Specify the workspace directory for agent-specific workspaces"
 )
 @click.pass_context
 def main(
@@ -60,12 +51,7 @@ def main(
     allow_downloads: bool,
     workspace_directory: str,
 ) -> None:
-    """
-    Welcome to AutoLlama an experimental open-source application showcasing the capabilities of Llama3 pushing the boundaries of AI.
-
-    Start an Auto-Llama assistant.
-    """
-    # Put imports inside function to avoid importing everything when starting the CLI
+    """Start an Auto-Llama assistant."""
     from autollama.main import run_auto_llama
 
     if ctx.invoked_subcommand is None:
@@ -80,7 +66,6 @@ def main(
             allow_downloads,
             workspace_directory,
         )
-
 
 if __name__ == "__main__":
     main()

@@ -68,10 +68,12 @@ class Config(metaclass=Singleton):
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36"
             " (KHTML, like Gecko) Chrome/83.0.4103.97 Safari/537.36",
         )
-        self.memory_index = os.getenv("MEMORY_INDEX", "auto-llama")
+        self.memory_index = os.getenv("MEMORY_INDEX", "autollama")
         # Note that indexes must be created on db 0 in redis, this is not configurable.
 
-        self.memory_backend = os.getenv("MEMORY_BACKEND", "local")
+        self.memory_backend = os.getenv("MEMORY_BACKEND", "LocalCache")
+        self.pinecone_api_key = os.getenv("PINECONE_API_KEY")
+        self.pinecone_region = os.getenv("PINECONE_REGION")
 
 
     def set_continuous_mode(self, value: bool) -> None:

@@ -15,3 +15,6 @@ ai_settings.yaml
 
 # Ignore auto_llama_workspace directory
 auto_llama_workspace/
+
+# Ignore specific helper file
+find_os.py

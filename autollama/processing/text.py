@@ -30,7 +30,7 @@ def split_text(
         message_with_current_chunk = [create_message(" ".join(current_chunk), question)]
 
         expected_token_usage = (
-            count_message_tokens(messages=message_with_current_chunk, model=model)
+            count_message_tokens(messages=message_with_current_chunk)
             + 1
         )
         if expected_token_usage > max_length:
@@ -70,7 +70,7 @@ def summarize_text(
         memory.add(memory_to_add)
 
         messages = [create_message(chunk, question)]
-        tokens_for_chunk = count_message_tokens(messages, model)
+        tokens_for_chunk = count_message_tokens(messages)
         logger.info(
             f"Summarizing chunk {i + 1} / {len(chunks)} of length {len(chunk)} characters, or {tokens_for_chunk} tokens"
         )

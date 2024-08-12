@@ -1,6 +1,6 @@
-""" Command and Control """
+"""Command and Control module for AutoLlama."""
 import json
-from typing import Dict, List, NoReturn, Union
+from typing import Dict, List, Union
 
 from autollama.agent.agent_manager import AgentManager
 from autollama.commands.command import CommandRegistry, command
@@ -17,14 +17,7 @@ AGENT_MANAGER = AgentManager()
 
 
 def is_valid_int(value: str) -> bool:
-    """Check if the value is a valid integer
-
-    Args:
-        value (str): The value to check
-
-    Returns:
-        bool: True if the value is a valid integer, False otherwise
-    """
+    """Check if the value is a valid integer."""
     try:
         int(value)
         return True
@@ -32,204 +25,107 @@ def is_valid_int(value: str) -> bool:
         return False
 
 
-def get_command(response_json: Dict):
-    """Parse the response and return the command name and arguments
+def get_command(response_json: Dict) -> Union[tuple, str]:
+    """Parse the response and return the command name and arguments."""
+    if not isinstance(response_json, dict):
+        return "Error:", f"'response_json' is not a dictionary: {response_json}"
 
-    Args:
-        response_json (json): The response from the AI
+    command = response_json.get("command")
+    if not isinstance(command, dict):
+        return "Error:", "'command' object is not a dictionary"
 
-    Returns:
-        tuple: The command name and arguments
+    command_name = command.get("name")
+    if not command_name:
+        return "Error:", "Missing 'name' field in 'command' object"
 
-    Raises:
-        json.decoder.JSONDecodeError: If the response is not valid JSON
-
-        Exception: If any other error occurs
-    """
-    try:
-        if "command" not in response_json:
-            return "Error:", "Missing 'command' object in JSON"
-
-        if not isinstance(response_json, dict):
-            return "Error:", f"'response_json' object is not dictionary {response_json}"
-
-        command = response_json["command"]
-        if not isinstance(command, dict):
-            return "Error:", "'command' object is not a dictionary"
-
-        if "name" not in command:
-            return "Error:", "Missing 'name' field in 'command' object"
-
-        command_name = command["name"]
-
-        # Use an empty dictionary if 'args' field is not present in 'command' object
-        arguments = command.get("args", {})
-
-        return command_name, arguments
-    except json.decoder.JSONDecodeError:
-        return "Error:", "Invalid JSON"
-    # All other errors, return "Error: + error message"
-    except Exception as e:
-        return "Error:", str(e)
+    arguments = command.get("args", {})
+    return command_name, arguments
 
 
-def map_command_synonyms(command_name: str):
-    """Takes the original command name given by the AI, and checks if the
-    string matches a list of common/known hallucinations
-    """
-    synonyms = [
-        ("write_file", "write_to_file"),
-        ("create_file", "write_to_file"),
-        ("search", "google"),
-    ]
-    for seen_command, actual_command_name in synonyms:
-        if command_name == seen_command:
-            return actual_command_name
-    return command_name
+def map_command_synonyms(command_name: str) -> str:
+    """Map synonyms to their actual command names."""
+    synonyms = {
+        "write_file": "write_to_file",
+        "create_file": "write_to_file",
+        "search": "google",
+    }
+    return synonyms.get(command_name, command_name)
 
 
 def execute_command(
     command_registry: CommandRegistry,
     command_name: str,
-    arguments,
+    arguments: dict,
     prompt: PromptGenerator,
-):
-    """Execute the command and return the result
-
-    Args:
-        command_name (str): The name of the command to execute
-        arguments (dict): The arguments for the command
-
-    Returns:
-        str: The result of the command
-    """
+) -> str:
+    """Execute the command and return the result."""
     try:
+        command_name = map_command_synonyms(command_name.lower())
         cmd = command_registry.commands.get(command_name)
-
-        # If the command is found, call it with the provided arguments
+        
         if cmd:
             return cmd(**arguments)
 
-        # TODO: Remove commands below after they are moved to the command registry.
-        command_name = map_command_synonyms(command_name.lower())
-
+        # Custom memory operations
         if command_name == "memory_add":
-            return get_memory(CFG).add(arguments["string"])
+            return get_memory(CFG).add(arguments.get("string"))
 
-        # TODO: Change these to take in a file rather than pasted code, if
-        # non-file is given, return instructions "Input should be a python
-        # filepath, write your code to file and try again
-        else:
-            for command in prompt.commands:
-                if (
-                    command_name == command["label"].lower()
-                    or command_name == command["name"].lower()
-                ):
-                    return command["function"](**arguments)
-            return (
-                f"Unknown command '{command_name}'. Please refer to the 'COMMANDS'"
-                " list for available commands and only respond in the specified JSON"
-                " format."
-            )
+        # Execute command from prompt if found
+        for command in prompt.commands:
+            if command_name in (command["label"].lower(), command["name"].lower()):
+                return command["function"](**arguments)
+
+        return f"Unknown command '{command_name}'. Please refer to the 'COMMANDS' list for available commands."
     except Exception as e:
         return f"Error: {str(e)}"
 
 
-@command(
-    "get_text_summary", "Get text summary", '"url": "<url>", "question": "<question>"'
-)
+@command("get_text_summary", "Get text summary", '"url": "<url>", "question": "<question>"')
 @validate_url
 def get_text_summary(url: str, question: str) -> str:
-    """Return the results of a Google search
-
-    Args:
-        url (str): The url to scrape
-        question (str): The question to summarize the text for
-
-    Returns:
-        str: The summary of the text
-    """
+    """Return a summary of the text from a given URL."""
     text = scrape_text(url)
     summary = summarize_text(url, text, question)
-    return f""" "Result" : {summary}"""
+    return f'"Result": {summary}'
 
 
-@command("get_hyperlinks", "Get text summary", '"url": "<url>"')
+@command("get_hyperlinks", "Get hyperlinks", '"url": "<url>"')
 @validate_url
 def get_hyperlinks(url: str) -> Union[str, List[str]]:
-    """Return the results of a Google search
-
-    Args:
-        url (str): The url to scrape
-
-    Returns:
-        str or list: The hyperlinks on the page
-    """
+    """Return the hyperlinks found on a given URL."""
     return scrape_links(url)
 
-@command(
-    "start_agent",
-    "Start Llama Agent",
-    '"name": "<name>", "task": "<short_task_desc>", "prompt": "<prompt>"',
-)
+
+@command("start_agent", "Start Llama Agent", '"name": "<name>", "task": "<task>", "prompt": "<prompt>"')
 def start_agent(name: str, task: str, prompt: str, model=CFG.llama_ai_model) -> str:
-    """Start an agent with a given name, task, and prompt
-
-    Args:
-        name (str): The name of the agent
-        task (str): The task of the agent
-        prompt (str): The prompt for the agent
-        model (str): The model to use for the agent
-
-    Returns:
-        str: The response of the agent
-    """
-    # Remove underscores from name
+    """Start an agent with a given name, task, and prompt."""
     voice_name = name.replace("_", " ")
-
-    first_message = f"""You are {name}.  Respond with: "Acknowledged"."""
+    first_message = f"You are {name}. Respond with: 'Acknowledged.'"
     agent_intro = f"{voice_name} here, Reporting for duty!"
 
-    # Create agent
-    # Assign task (prompt), get response
+    key = AGENT_MANAGER.create_agent(name, model)
     agent_response = AGENT_MANAGER.message_agent(key, prompt)
-
     return f"Agent {name} created with key {key}. First response: {agent_response}"
 
 
 @command("message_agent", "Message Llama Agent", '"key": "<key>", "message": "<message>"')
 def message_agent(key: str, message: str) -> str:
-    """Message an agent with a given key and message"""
-    # Check if the key is a valid integer
-    if is_valid_int(key):
-        agent_response = AGENT_MANAGER.message_agent(int(key), message)
-    else:
+    """Send a message to an agent with the specified key."""
+    if not is_valid_int(key):
         return "Invalid key, must be an integer."
 
-    return agent_response
+    return AGENT_MANAGER.message_agent(int(key), message)
 
 
 @command("list_agents", "List Llama Agents", "")
 def list_agents() -> str:
-    """List all agents
-
-    Returns:
-        str: A list of all agents
-    """
-    return "List of agents:\n" + "\n".join(
-        [str(x[0]) + ": " + x[1] for x in AGENT_MANAGER.list_agents()]
-    )
+    """List all active agents."""
+    return "List of agents:\n" + "\n".join([f"{x[0]}: {x[1]}" for x in AGENT_MANAGER.list_agents()])
 
 
 @command("delete_agent", "Delete Llama Agent", '"key": "<key>"')
 def delete_agent(key: str) -> str:
-    """Delete an agent with a given key
-
-    Args:
-        key (str): The key of the agent to delete
-
-    Returns:
-        str: A message indicating whether the agent was deleted or not
-    """
-    result = AGENT_MANAGER.delete_agent(key)
-    return f"Agent {key} deleted." if result else f"Agent {key} does not exist."
+    """Delete an agent with the specified key."""
+    if AGENT_MANAGER.delete_agent(key):
+        return f"Agent {key} deleted."
+    return f"Agent {key} does not exist."

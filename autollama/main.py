@@ -1,9 +1,8 @@
-"""The application entry point.  Can be invoked by a CLI or any other front end application."""
+"""The application entry point. Can be invoked by a CLI or any other front-end application."""
 import logging
-import sys
 from pathlib import Path
 
-from colorama import Fore, Style
+from colorama import Fore
 
 from autollama.agent.agent import Agent
 from autollama.commands.command import CommandRegistry
@@ -12,9 +11,7 @@ from autollama.configurator import create_config
 from autollama.logs import logger
 from autollama.memory import get_memory
 from autollama.prompts.prompt import DEFAULT_TRIGGERING_PROMPT, construct_main_ai_config
-from autollama.utils import markdown_to_ansi_style
 from autollama.workspace import Workspace
-
 
 def run_auto_llama(
     continuous: bool,
@@ -25,14 +22,21 @@ def run_auto_llama(
     memory_type: str,
     browser_name: str,
     allow_downloads: bool,
-    workspace_directory: str,
+    workspace_directory: str = None,
 ):
-    # Configure logging before we do anything else.
+    # Configure logging
     logger.set_level(logging.DEBUG if debug else logging.INFO)
+    
+    # Initial debug output for troubleshooting
+    logger.debug(f"Running with parameters: continuous={continuous}, "
+                 f"continuous_limit={continuous_limit}, ai_settings='{ai_settings}', "
+                 f"skip_reprompt={skip_reprompt}, debug={debug}, "
+                 f"memory_type='{memory_type}', browser_name='{browser_name}', "
+                 f"allow_downloads={allow_downloads}, workspace_directory='{workspace_directory}'")
 
     cfg = Config()
-    # TODO: fill in llm values here
     check_groq_api_key()
+
     create_config(
         continuous,
         continuous_limit,
@@ -42,72 +46,77 @@ def run_auto_llama(
         memory_type,
         browser_name,
         allow_downloads,
-        workspace_directory
+        workspace_directory,
     )
 
+    workspace_directory = Path(workspace_directory or Path(__file__).parent / "auto_llama_workspace")
+    logger.debug(f"Resolved workspace directory: {workspace_directory}")
 
-    # TODO: have this directory live outside the repository (e.g. in a user's
-    #   home directory) and have it come in as a command line argument or part of
-    #   the env file.
-    if workspace_directory is None:
-        workspace_directory = Path(__file__).parent / "auto_llama_workspace"
-    else:
-        workspace_directory = Path(workspace_directory)
-    # TODO: pass in the ai_settings file and the env file and have them cloned into
-    #   the workspace directory so we can bind them to the agent.
     workspace_directory = Workspace.make_workspace(workspace_directory)
     cfg.workspace_path = str(workspace_directory)
 
-    # HACK: doing this here to collect some globals that depend on the workspace.
+    # Debugging for workspace path
+    logger.info(f"Workspace path set to: {cfg.workspace_path}")
+
+    # Ensure the file logger is properly set up
     file_logger_path = workspace_directory / "file_logger.txt"
     if not file_logger_path.exists():
-        with file_logger_path.open(mode="w", encoding="utf-8") as f:
-            f.write("File Operation Logger ")
+        logger.debug(f"Creating file logger at: {file_logger_path}")
+        file_logger_path.write_text("File Operation Logger\n", encoding="utf-8")
+    else:
+        logger.debug(f"File logger already exists at: {file_logger_path}")
 
     cfg.file_logger_path = str(file_logger_path)
+    
+    # Test file writing permissions by writing a test file
+    test_file_path = workspace_directory / "test_write.txt"
+    try:
+        test_file_path.write_text("Test write to verify permissions.\n", encoding="utf-8")
+        logger.info("Test file written successfully.")
+    except Exception as e:
+        logger.error(f"Failed to write test file. Error: {e}")
+        return
 
-    # Create a CommandRegistry instance and scan default folder
     command_registry = CommandRegistry()
-    command_registry.import_commands("autollama.commands.analyze_code")
-    command_registry.import_commands("autollama.commands.execute_code")
-    command_registry.import_commands("autollama.commands.file_operations")
-    command_registry.import_commands("autollama.commands.git_operations")
-    command_registry.import_commands("autollama.commands.google_search")
-    command_registry.import_commands("autollama.commands.improve_code")
-    command_registry.import_commands("autollama.commands.web_selenium")
-    command_registry.import_commands("autollama.commands.write_tests")
-    command_registry.import_commands("autollama.app")
-    command_registry.import_commands("autollama.commands.task_statuses")
+    command_modules = [
+        "autollama.commands.analyze_code",
+        "autollama.commands.execute_code",
+        "autollama.commands.file_operations",
+        "autollama.commands.git_operations",
+        "autollama.commands.google_search",
+        "autollama.commands.improve_code",
+        "autollama.commands.web_selenium",
+        "autollama.commands.write_tests",
+        "autollama.app",
+        "autollama.commands.task_statuses",
+    ]
+    
+    for module in command_modules:
+        logger.debug(f"Importing commands from module: {module}")
+        command_registry.import_commands(module)
 
-    ai_name = ""
     ai_config = construct_main_ai_config()
     ai_config.command_registry = command_registry
-    # print(prompt)
-    # Initialize variables
-    full_message_history = []
-    next_action_count = 0
 
-    
-    # Initialize memory and make sure it is empty.
-    # this is particularly important for indexing and referencing pinecone memory
     memory = get_memory(cfg, init=True)
-    logger.typewriter_log(
-        "Using memory of type:", Fore.GREEN, f"{memory.__class__.__name__}"
-    )
+    logger.typewriter_log("Using memory of type:", Fore.GREEN, f"{memory.__class__.__name__}")
     logger.typewriter_log("Using Browser:", Fore.GREEN, cfg.selenium_web_browser)
-    system_prompt = ai_config.construct_full_prompt()
+
     if cfg.debug_mode:
-        logger.typewriter_log("Prompt:", Fore.GREEN, system_prompt)
+        logger.typewriter_log("Prompt:", Fore.GREEN, ai_config.construct_full_prompt())
 
     agent = Agent(
-        ai_name=ai_name,
+        ai_name="AutoLlama",
         memory=memory,
-        full_message_history=full_message_history,
-        next_action_count=next_action_count,
+        full_message_history=[],
+        next_action_count=0,
         command_registry=command_registry,
         config=ai_config,
-        system_prompt=system_prompt,
+        system_prompt=ai_config.construct_full_prompt(),
         triggering_prompt=DEFAULT_TRIGGERING_PROMPT,
         workspace_directory=workspace_directory,
     )
+
+    # Start the interaction loop
+    logger.info("Starting the interaction loop...")
     agent.start_interaction_loop()
