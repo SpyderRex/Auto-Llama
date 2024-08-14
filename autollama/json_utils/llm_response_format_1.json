@@ -7,7 +7,7 @@
             "properties": {
                 "text": {"type": "string"},
                 "reasoning": {"type": "string"},
-                "plan": {"type": "array"},
+                "plan": {"type": ["string", "array"]},
                 "criticism": {"type": "string"}
             },
             "required": ["text", "reasoning", "plan", "criticism"],

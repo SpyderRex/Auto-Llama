@@ -211,6 +211,8 @@ def write_to_file(filename: str, text: str) -> str:
         str: A message indicating success or failure
     """
     checksum = text_checksum(text)
+    logger.info("Write command called!")
+    
     if is_duplicate_operation("write", filename, checksum):
         return "Error: File has already been updated."
     try:
