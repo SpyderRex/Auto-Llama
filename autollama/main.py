@@ -47,16 +47,11 @@ def run_auto_llama(
         allow_downloads,
     )
 
-
-    # TODO: have this directory live outside the repository (e.g. in a user's
-    #   home directory) and have it come in as a command line argument or part of
-    #   the env file.
     if workspace_directory is None:
         workspace_directory = Path(__file__).parent / "auto_llama_workspace"
     else:
         workspace_directory = Path(workspace_directory)
-    # TODO: pass in the ai_settings file and the env file and have them cloned into
-    #   the workspace directory so we can bind them to the agent.
+
     workspace_directory = Workspace.make_workspace(workspace_directory)
     cfg.workspace_path = str(workspace_directory)
 

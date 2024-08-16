@@ -14,6 +14,8 @@ from autollama.llm.api_manager import ApiManager
 from autollama.llm.base import Message
 from autollama.logs import logger
 
+CFG = Config()
+
 
 def retry_api(
     num_retries: int = 10,
@@ -78,8 +80,7 @@ def call_ai_function(
         str: The response from the function.
     """
     cfg = Config()
-    if model is None:
-        model = cfg.llm_model
+    model = cfg.llm_model
     # For each arg, if any are None, convert to "None":
     args = [str(arg) if arg is not None else "None" for arg in args]
     # parse args to comma-separated string
@@ -100,7 +101,7 @@ def call_ai_function(
 # simple retry mechanism when getting a rate error or a bad gateway
 def create_chat_completion(
     messages: List[Message],  # type: ignore
-    model: Optional[str] = None,
+    model: CFG.llm_model,
     temperature: float = None,
     max_tokens: Optional[int] = None,
 ) -> str:
@@ -130,7 +131,7 @@ def create_chat_completion(
         backoff = 2 ** (attempt + 2)
         try:
             response = api_manager.create_chat_completion(
-                model=model,
+                model=CFG.llm_model,
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,

@@ -48,7 +48,7 @@ def generate_context(prompt, relevant_memory, full_message_history, model):
     next_message_to_add_index = len(full_message_history) - 1
     insertion_index = len(current_context)
     # Count the currently used tokens
-    current_tokens_used = count_message_tokens(current_context, model)
+    current_tokens_used = count_message_tokens(current_context)
     return (
         next_message_to_add_index,
         current_tokens_used,
@@ -61,12 +61,12 @@ def generate_context(prompt, relevant_memory, full_message_history, model):
 def chat_with_ai(
     agent, prompt, user_input, full_message_history, permanent_memory, token_limit
 ):
-    """Interact with the OpenAI API, sending the prompt, user input, message history,
+    """Interact with the Groq API, sending the prompt, user input, message history,
     and permanent memory."""
     while True:
         try:
             """
-            Interact with the OpenAI API, sending the prompt, user input,
+            Interact with the Groq API, sending the prompt, user input,
                 message history, and permanent memory.
 
             Args:
@@ -120,17 +120,17 @@ def chat_with_ai(
             #     )
 
             current_tokens_used += count_message_tokens(
-                [create_chat_message("user", user_input)], model
+                [create_chat_message("user", user_input)]
             )  # Account for user input (appended later)
 
             current_tokens_used += 500  # Account for memory (appended later) TODO: The final memory may be less than 500 tokens
 
-            # Add Messages until the token limit is reached or there are no more messages to add.
+            # Add Messages until the token limit is reach   ed or there are no more messages to add.
             while next_message_to_add_index >= 0:
                 # print (f"CURRENT TOKENS USED: {current_tokens_used}")
                 message_to_add = full_message_history[next_message_to_add_index]
 
-                tokens_to_add = count_message_tokens([message_to_add], model)
+                tokens_to_add = count_message_tokens([message_to_add])
                 if current_tokens_used + tokens_to_add > send_token_limit:
                     # save_memory_trimmed_from_context_window(
                     #     full_message_history,
@@ -176,8 +176,6 @@ def chat_with_ai(
             # Calculate remaining tokens
             tokens_remaining = token_limit - current_tokens_used
             # assert tokens_remaining >= 0, "Tokens remaining is negative.
-            # This should never happen, please submit a bug report at
-            #  https://www.github.com/Torantulino/Auto-GPT"
 
             # Debug print the current context
             logger.debug(f"Token limit: {token_limit}")
