@@ -101,7 +101,7 @@ def call_ai_function(
 # simple retry mechanism when getting a rate error or a bad gateway
 def create_chat_completion(
     messages: List[Message],  # type: ignore
-    model: CFG.llm_model,
+    model=CFG.llm_model,
     temperature: float = None,
     max_tokens: Optional[int] = None,
 ) -> str:
@@ -194,8 +194,7 @@ def get_spacy_embedding(text: str) -> List[float]:
     Returns:
         List[float]: The embedding.
     """
-    cfg = Config()
-    model = cfg.embedding_model
+    model = CFG.embedding_model
     text = text.replace("\n", " ")
 
     embedding = create_embedding(text, model=model)
@@ -205,7 +204,7 @@ def get_spacy_embedding(text: str) -> List[float]:
 @retry_api()
 def create_embedding(
     text: str,
-    model: Optional[str] = None,
+    model=CFG.embedding_model,
     **kwargs,
 ) -> List[float]:
     """Create an embedding using Spacy.
@@ -217,8 +216,7 @@ def create_embedding(
     Returns:
         List[float]: The embedding.
     """
-    cfg = Config()
-    nlp = spacy.load(model if model else cfg.embedding_model)
+    nlp = spacy.load(CFG.embedding_model)
     doc = nlp(text)
     embedding = doc.vector.tolist()
     return embedding 
