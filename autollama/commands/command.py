@@ -3,8 +3,8 @@ import importlib
 import inspect
 from typing import Any, Callable, Optional
 
-# Unique identifier for auto-llama commands
-AUTO_LLAMA_COMMAND_IDENTIFIER = "auto_llama_command"
+# Unique identifier for auto-gpt commands
+AUTO_GPT_COMMAND_IDENTIFIER = "auto_gpt_command"
 
 
 class Command:
@@ -44,7 +44,9 @@ class Command:
 class CommandRegistry:
     """
     The CommandRegistry class is a manager for a collection of Command objects.
-    It allows the registration, modification, and retrieval of Command objects.
+    It allows the registration, modification, and retrieval of Command objects,
+    as well as the scanning and loading of command plugins from a specified
+    directory.
     """
 
     def __init__(self):
@@ -97,7 +99,7 @@ class CommandRegistry:
         Imports the specified Python module containing command plugins.
 
         This method imports the associated module and registers any functions or
-        classes that are decorated with the `AUTO_LLAMA_COMMAND_IDENTIFIER` attribute
+        classes that are decorated with the `AUTO_GPT_COMMAND_IDENTIFIER` attribute
         as `Command` objects. The registered `Command` objects are then added to the
         `commands` dictionary of the `CommandRegistry` object.
 
@@ -110,8 +112,8 @@ class CommandRegistry:
         for attr_name in dir(module):
             attr = getattr(module, attr_name)
             # Register decorated functions
-            if hasattr(attr, AUTO_LLAMA_COMMAND_IDENTIFIER) and getattr(
-                attr, AUTO_LLAMA_COMMAND_IDENTIFIER
+            if hasattr(attr, AUTO_GPT_COMMAND_IDENTIFIER) and getattr(
+                attr, AUTO_GPT_COMMAND_IDENTIFIER
             ):
                 self.register(attr.command)
             # Register command classes
@@ -147,7 +149,7 @@ def command(
 
         wrapper.command = cmd
 
-        setattr(wrapper, AUTO_LLAMA_COMMAND_IDENTIFIER, True)
+        setattr(wrapper, AUTO_GPT_COMMAND_IDENTIFIER, True)
 
         return wrapper
 

@@ -40,8 +40,15 @@ def build_default_prompt_generator() -> PromptGenerator:
     prompt_generator.add_constraint(
         'Exclusively use the commands listed in double quotes e.g. "command name"'
     )
-    if CFG.google_api_key:
-        prompt_generator.add_constraint("Always make your first use of the 'browse_website' command limited to google with the user's question or request as the query in the google search. Only after that may you use other urls scraped from the intial and subsequent searches.")
+
+    # Define the command list
+    commands = [
+        ("Task Complete (Shutdown)", "task_complete", {"reason": "<reason>"}),
+    ]
+
+    # Add commands to the PromptGenerator object
+    for command_label, command_name, args in commands:
+        prompt_generator.add_command(command_label, command_name, args)
 
     # Add resources to the PromptGenerator object
     prompt_generator.add_resource(
@@ -53,12 +60,10 @@ def build_default_prompt_generator() -> PromptGenerator:
     )
     prompt_generator.add_resource("File output.")
 
-
     # Add performance evaluations to the PromptGenerator object
     prompt_generator.add_performance_evaluation(
         "Continuously review and analyze your actions to ensure you are performing to"
         " the best of your abilities."
-
     )
     prompt_generator.add_performance_evaluation(
         "Constructively self-criticize your big-picture behavior constantly."
@@ -85,11 +90,6 @@ def construct_main_ai_config() -> AIConfig:
         logger.typewriter_log("Name :", Fore.GREEN, config.ai_name)
         logger.typewriter_log("Role :", Fore.GREEN, config.ai_role)
         logger.typewriter_log("Goals:", Fore.GREEN, f"{config.ai_goals}")
-        logger.typewriter_log(
-            "API Budget:",
-            Fore.GREEN,
-            "infinite" if config.api_budget <= 0 else f"${config.api_budget}",
-        )
     elif config.ai_name:
         logger.typewriter_log(
             "Welcome back! ",
@@ -102,7 +102,6 @@ def construct_main_ai_config() -> AIConfig:
 Name:  {config.ai_name}
 Role:  {config.ai_role}
 Goals: {config.ai_goals}
-API Budget: {"infinite" if config.api_budget <= 0 else f"${config.api_budget}"}
 Continue ({CFG.authorise_key}/{CFG.exit_key}): """
         )
         if should_continue.lower() == CFG.exit_key:
@@ -114,7 +113,6 @@ Continue ({CFG.authorise_key}/{CFG.exit_key}): """
 
     # set the total api budget
     api_manager = ApiManager()
-    api_manager.set_total_budget(config.api_budget)
 
     # Agent Created, print message
     logger.typewriter_log(

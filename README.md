@@ -35,11 +35,11 @@ pip install -r requirements.txt
 ## Usage
 To run AutoLlama, simply execute the following command in your terminal:
 ```bash
-python -m autollama
+./run.sh
 ```
-or
+Or, if you wish to run AutoLlama in continuous mode:
 ```bash
-python3 -m autollama
+./run_continuous
 ```
 
 ## Contributing

@@ -3,7 +3,7 @@ from typing import List, TypedDict
 
 
 class Message(TypedDict):
-    """Groq Message object containing a role and the message content"""
+    """OpenAI Message object containing a role and the message content"""
 
     role: str
     content: str

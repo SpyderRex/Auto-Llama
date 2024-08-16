@@ -1,34 +1,26 @@
 from __future__ import annotations
 
+from groq import Groq
+
 from autollama.config import Config
 from autollama.logs import logger
 from autollama.singleton import Singleton
-
-from groq import Groq
-
-cfg = Config()
 
 class ApiManager(metaclass=Singleton):
     def __init__(self):
         self.total_prompt_tokens = 0
         self.total_completion_tokens = 0
-        self.total_cost = 0
-        self.total_budget = 0
-        self.client = Groq(api_key=cfg.groq_api_key)
 
     def reset(self):
         self.total_prompt_tokens = 0
         self.total_completion_tokens = 0
-        self.total_cost = 0
-        self.total_budget = 0.0
 
     def create_chat_completion(
         self,
         messages: list,  # type: ignore
-        model: cfg.llama_ai_model,
+        model: str | None = None,
         temperature: float = None,
         max_tokens: int | None = None,
-        deployment_id=None,
     ) -> str:
         """
         Create a chat completion and update the cost.
@@ -41,58 +33,22 @@ class ApiManager(metaclass=Singleton):
         str: The AI's response.
         """
         cfg = Config()
+        client = Groq(api_key=cfg.groq_api_key)
         if temperature is None:
             temperature = cfg.temperature
-        if deployment_id is not None:
-            response = self.client.chat.completions.create(
-                deployment_id=deployment_id,
 
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                api_key=cfg.groq_api_key,
-            )
-        else:
-            response = self.client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                api_key=cfg.groq_api_key,
-            )
-                
+        response = client.chat.completions.create(
+            model=cfg.llm_model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
         logger.debug(f"Response: {response}")
         prompt_tokens = response.usage.prompt_tokens
         completion_tokens = response.usage.completion_tokens
-        self.update_cost(prompt_tokens, completion_tokens, model)
+
         return response
 
-    def update_cost(self, prompt_tokens, completion_tokens, model):
-        """
-        Update the total cost, prompt tokens, and completion tokens.
-
-        Args:
-        prompt_tokens (int): The number of tokens used in the prompt.
-        completion_tokens (int): The number of tokens used in the completion.
-        model (str): The model used for the API call.
-        """
-        self.total_prompt_tokens += prompt_tokens
-        self.total_completion_tokens += completion_tokens
-        self.total_cost += (
-            prompt_tokens * COSTS[model]["prompt"]
-            + completion_tokens * COSTS[model]["completion"]
-        ) / 1000
-        logger.debug(f"Total running cost: ${self.total_cost:.3f}")
-
-    def set_total_budget(self, total_budget):
-        """
-        Sets the total user-defined budget for API calls.
-
-        Args:
-        total_budget (float): The total budget for API calls.
-        """
-        self.total_budget = total_budget
 
     def get_total_prompt_tokens(self):
         """
@@ -111,21 +67,3 @@ class ApiManager(metaclass=Singleton):
         int: The total number of completion tokens.
         """
         return self.total_completion_tokens
-
-    def get_total_cost(self):
-        """
-        Get the total cost of API calls.
-
-        Returns:
-        float: The total cost of API calls.
-        """
-        return self.total_cost
-
-    def get_total_budget(self):
-        """
-        Get the total user-defined budget for API calls.
-
-        Returns:
-        float: The total budget for API calls.
-        """
-        return self.total_budget

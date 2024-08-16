@@ -1,6 +1,6 @@
-"""Agent manager for managing Llama agents"""
+"""Agent manager for managing GPT agents"""
 from __future__ import annotations
-import os
+
 from typing import List
 
 from autollama.config.config import Config
@@ -9,14 +9,14 @@ from autollama.singleton import Singleton
 
 
 class AgentManager(metaclass=Singleton):
-    """Agent manager for managing Llama agents"""
+    """Agent manager for managing GPT agents"""
 
     def __init__(self):
         self.next_key = 0
         self.agents = {}  # key, (task, full_message_history, model)
         self.cfg = Config()
 
-    # Create new Llama agent
+    # Create new GPT agent
     # TODO: Centralise use of create_chat_completion() to globally enforce token limit
 
     def create_agent(self, task: str, prompt: str, model: str) -> tuple[int, str]:
@@ -33,7 +33,12 @@ class AgentManager(metaclass=Singleton):
         messages: List[Message] = [
             {"role": "user", "content": prompt},
         ]
-        # Start Llama instance
+        for plugin in self.cfg.plugins:
+            if not plugin.can_handle_pre_instruction():
+                continue
+            if plugin_messages := plugin.pre_instruction(messages):
+                messages.extend(iter(plugin_messages))
+        # Start GPT instance
         agent_reply = create_chat_completion(
             model=model,
             messages=messages,
@@ -41,12 +46,27 @@ class AgentManager(metaclass=Singleton):
 
         messages.append({"role": "assistant", "content": agent_reply})
 
+        plugins_reply = ""
+        for i, plugin in enumerate(self.cfg.plugins):
+            if not plugin.can_handle_on_instruction():
+                continue
+            if plugin_result := plugin.on_instruction(messages):
+                sep = "\n" if i else ""
+                plugins_reply = f"{plugins_reply}{sep}{plugin_result}"
+
+        if plugins_reply and plugins_reply != "":
+            messages.append({"role": "assistant", "content": plugins_reply})
         key = self.next_key
         # This is done instead of len(agents) to make keys unique even if agents
         # are deleted
         self.next_key += 1
 
         self.agents[key] = (task, messages, model)
+
+        for plugin in self.cfg.plugins:
+            if not plugin.can_handle_post_instruction():
+                continue
+            agent_reply = plugin.post_instruction(agent_reply)
 
         return key, agent_reply
 
@@ -65,13 +85,36 @@ class AgentManager(metaclass=Singleton):
         # Add user message to message history before sending to agent
         messages.append({"role": "user", "content": message})
 
-        # Start Llama instance
+        for plugin in self.cfg.plugins:
+            if not plugin.can_handle_pre_instruction():
+                continue
+            if plugin_messages := plugin.pre_instruction(messages):
+                for plugin_message in plugin_messages:
+                    messages.append(plugin_message)
+
+        # Start GPT instance
         agent_reply = create_chat_completion(
             model=model,
             messages=messages,
         )
 
         messages.append({"role": "assistant", "content": agent_reply})
+
+        plugins_reply = agent_reply
+        for i, plugin in enumerate(self.cfg.plugins):
+            if not plugin.can_handle_on_instruction():
+                continue
+            if plugin_result := plugin.on_instruction(messages):
+                sep = "\n" if i else ""
+                plugins_reply = f"{plugins_reply}{sep}{plugin_result}"
+        # Update full message history
+        if plugins_reply and plugins_reply != "":
+            messages.append({"role": "assistant", "content": plugins_reply})
+
+        for plugin in self.cfg.plugins:
+            if not plugin.can_handle_post_instruction():
+                continue
+            agent_reply = plugin.post_instruction(agent_reply)
 
         return agent_reply
 

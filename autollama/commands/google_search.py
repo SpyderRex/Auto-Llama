@@ -1,4 +1,4 @@
-"""Google search command for AutoLlama."""
+"""Google search command for Autogpt."""
 from __future__ import annotations
 
 import json
@@ -22,11 +22,11 @@ def google_search(query: str, num_results: int = 8) -> str:
     Returns:
         str: The results of the search.
     """
+    ddg = DDGS()
     search_results = []
     if not query:
-
         return json.dumps(search_results)
-    ddg = DDGS()
+    
     results = ddg.text(query, max_results=num_results)
     if not results:
         return json.dumps(search_results)

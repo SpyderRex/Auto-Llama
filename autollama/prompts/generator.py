@@ -18,7 +18,6 @@ class PromptGenerator:
         self.commands = []
         self.resources = []
         self.performance_evaluation = []
-        self.system_limitations = []
         self.goals = []
         self.command_registry = None
         self.name = "Bob"
@@ -29,6 +28,7 @@ class PromptGenerator:
                 "reasoning": "reasoning",
                 "plan": "- short bulleted\n- list that conveys\n- long-term plan",
                 "criticism": "constructive self-criticism",
+                "speak": "thoughts summary to say to user",
             },
             "command": {"name": "command name", "args": {"arg name": "value"}},
         }
@@ -86,7 +86,7 @@ class PromptGenerator:
         """
         args_string = ", ".join(
             f'"{key}": "{value}"' for key, value in command["args"].items()
-         )
+        )
         return f'{command["label"]}: "{command["name"]}", args: {args_string}'
 
     def add_resource(self, resource: str) -> None:
@@ -106,15 +106,6 @@ class PromptGenerator:
             evaluation (str): The evaluation item to be added.
         """
         self.performance_evaluation.append(evaluation)
-
-    def add_system_limitation(self, system_limitation: str) -> None:
-        """
-        Add a system limitation item to the system_limitations list.
-
-        Args:
-            system_limitation (str) : The system limitation item to be added
-        """
-        self.system_limitations.append(system_limitation)
 
     def _generate_numbered_list(self, items: List[Any], item_type="list") -> str:
         """
@@ -158,8 +149,6 @@ class PromptGenerator:
             f"Resources:\n{self._generate_numbered_list(self.resources)}\n\n"
             "Performance Evaluation:\n"
             f"{self._generate_numbered_list(self.performance_evaluation)}\n\n"
-            "System Limitations:\n"
-            f"{self._generate_numbered_list(self.system_limitations)}\n\n"
             "You should only respond in JSON format as described below \nResponse"
             f" Format: \n{formatted_response_format} \nEnsure the response can be"
             " parsed by Python json.loads"

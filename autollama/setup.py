@@ -2,18 +2,12 @@
 import re
 
 from colorama import Fore, Style
-from jinja2 import Template
 
 from autollama import utils
 from autollama.config import Config
 from autollama.config.ai_config import AIConfig
 from autollama.llm import create_chat_completion
 from autollama.logs import logger
-from autollama.prompts.default_prompts import (
-    DEFAULT_SYSTEM_PROMPT_AICONFIG_AUTOMATIC,
-    DEFAULT_TASK_PROMPT_AICONFIG_AUTOMATIC,
-    DEFAULT_USER_DESIRE_PROMPT,
-)
 
 CFG = Config()
 
@@ -48,7 +42,7 @@ def prompt_user() -> AIConfig:
     )
 
     if user_desire == "":
-        user_desire = DEFAULT_USER_DESIRE_PROMPT  # Default prompt
+        user_desire = "Write a wikipedia style article about the project: https://github.com/SpyderRex/Auto-Llama"  # Default prompt
 
     # If user desire contains "--manual"
     if "--manual" in user_desire:
@@ -100,7 +94,7 @@ def generate_aiconfig_manual() -> AIConfig:
     )
     ai_name = utils.clean_input("AI Name: ")
     if ai_name == "":
-        ai_name = "Entrepreneur-LLAMA"
+        ai_name = "Entrepreneur-Llama"
 
     logger.typewriter_log(
         f"{ai_name} here!", Fore.LIGHTBLUE_EX, "I am at your service.", speak_text=True
@@ -139,28 +133,7 @@ def generate_aiconfig_manual() -> AIConfig:
             "Develop and manage multiple businesses autonomously",
         ]
 
-    # Get API Budget from User
-    logger.typewriter_log(
-        "Enter your budget for API calls: ",
-        Fore.GREEN,
-        "For example: $1.50",
-    )
-    logger.info("Enter nothing to let the AI run without monetary limit")
-    api_budget_input = utils.clean_input(
-        f"{Fore.LIGHTBLUE_EX}Budget{Style.RESET_ALL}: $"
-    )
-    if api_budget_input == "":
-        api_budget = 0.0
-    else:
-        try:
-            api_budget = float(api_budget_input.replace("$", ""))
-        except ValueError:
-            logger.typewriter_log(
-                "Invalid budget input. Setting budget to unlimited.", Fore.RED
-            )
-            api_budget = 0.0
-
-    return AIConfig(ai_name, ai_role, ai_goals, api_budget)
+    return AIConfig(ai_name, ai_role, ai_goals)
 
 
 def generate_aiconfig_automatic(user_prompt) -> AIConfig:
@@ -170,10 +143,27 @@ def generate_aiconfig_automatic(user_prompt) -> AIConfig:
     AIConfig: The AIConfig object tailored to the user's input
     """
 
-    system_prompt = DEFAULT_SYSTEM_PROMPT_AICONFIG_AUTOMATIC
-    prompt_ai_config_automatic = Template(
-        DEFAULT_TASK_PROMPT_AICONFIG_AUTOMATIC
-    ).render(user_prompt=user_prompt)
+    system_prompt = """
+Your task is to devise up to 5 highly effective goals and an appropriate role-based name (_Llama) for an autonomous agent, ensuring that the goals are optimally aligned with the successful completion of its assigned task.
+
+The user will provide the task, you will provide only the output in the exact format specified below with no explanation or conversation.
+
+Example input:
+Help me with marketing my business
+
+Example output:
+Name: CMO_Llama
+Description: a professional digital marketer AI that assists Solopreneurs in growing their businesses by providing world-class expertise in solving marketing problems for SaaS, content products, agencies, and more.
+Goals:
+- Engage in effective problem-solving, prioritization, planning, and supporting execution to address your marketing needs as your virtual Chief Marketing Officer.
+
+- Provide specific, actionable, and concise advice to help you make informed decisions without the use of platitudes or overly wordy explanations.
+
+- Identify and prioritize quick wins and cost-effective campaigns that maximize results with minimal time and budget investment.
+
+- Proactively take the lead in guiding you and offering suggestions when faced with unclear information or uncertainty to ensure your marketing strategy remains on track.
+"""
+
     # Call LLM with the string as user input
     messages = [
         {
@@ -182,10 +172,10 @@ def generate_aiconfig_automatic(user_prompt) -> AIConfig:
         },
         {
             "role": "user",
-            "content": prompt_ai_config_automatic,
+            "content": f"Task: '{user_prompt}'\nRespond only with the output in the exact format specified in the system prompt, with no explanation or conversation.\n",
         },
     ]
-    output = create_chat_completion(messages, CFG.llama_ai_model)
+    output = create_chat_completion(messages)
 
     # Debug LLM Output
     logger.debug(f"AI Config Generator Raw Output: {output}")
@@ -202,6 +192,5 @@ def generate_aiconfig_automatic(user_prompt) -> AIConfig:
         .strip()
     )
     ai_goals = re.findall(r"(?<=\n)-\s*(.*)", output)
-    api_budget = 0.0  # TODO: parse api budget using a regular expression
 
-    return AIConfig(ai_name, ai_role, ai_goals, api_budget)
+    return AIConfig(ai_name, ai_role, ai_goal)

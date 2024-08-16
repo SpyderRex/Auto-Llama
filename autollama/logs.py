@@ -5,12 +5,11 @@ import random
 import re
 import time
 from logging import LogRecord
-from typing import Any
 
 from colorama import Fore, Style
 
-from autollama.log_cycle.json_handler import JsonFileHandler, JsonFormatter
 from autollama.singleton import Singleton
+from autollama.speech import say_text
 
 
 class Logger(metaclass=Singleton):
@@ -75,16 +74,13 @@ class Logger(metaclass=Singleton):
         self.logger.addHandler(error_handler)
         self.logger.setLevel(logging.DEBUG)
 
-        self.json_logger = logging.getLogger("JSON_LOGGER")
-        self.json_logger.addHandler(self.file_handler)
-        self.json_logger.addHandler(error_handler)
-        self.json_logger.setLevel(logging.DEBUG)
-
         self.speak_mode = False
 
     def typewriter_log(
         self, title="", title_color="", content="", speak_text=False, level=logging.INFO
-    ):  
+    ):
+        if speak_text and self.speak_mode:
+            say_text(f"{title}. {content}")
 
         if content:
             if isinstance(content, list):
@@ -145,32 +141,10 @@ class Logger(metaclass=Singleton):
         if not additionalText:
             additionalText = (
                 "Please ensure you've setup and configured everything"
-                " correctly. Read https://github.com/SpyderRex/Auto-Llama#readme to "
-                "double check. You can also create a github issue or join the discord"
-                " and ask there!"
+                " correctly."
             )
 
         self.typewriter_log("DOUBLE CHECK CONFIGURATION", Fore.YELLOW, additionalText)
-
-    def log_json(self, data: Any, file_name: str) -> None:
-        # Define log directory
-        this_files_dir_path = os.path.dirname(__file__)
-        log_dir = os.path.join(this_files_dir_path, "../logs")
-
-        # Create a handler for JSON files
-        json_file_path = os.path.join(log_dir, file_name)
-        json_data_handler = JsonFileHandler(json_file_path)
-        json_data_handler.setFormatter(JsonFormatter())
-
-        # Log the JSON data using the custom file handler
-        self.json_logger.addHandler(json_data_handler)
-        self.json_logger.debug(data)
-        self.json_logger.removeHandler(json_data_handler)
-
-    def get_log_directory(self):
-        this_files_dir_path = os.path.dirname(__file__)
-        log_dir = os.path.join(this_files_dir_path, "../logs")
-        return os.path.abspath(log_dir)
 
 
 """
@@ -219,16 +193,12 @@ class AutoLlamaFormatter(logging.Formatter):
         if hasattr(record, "color"):
             record.title_color = (
                 getattr(record, "color")
-                + getattr(record, "title", "")
+                + getattr(record, "title")
                 + " "
                 + Style.RESET_ALL
             )
         else:
-            record.title_color = getattr(record, "title", "")
-
-        # Add this line to set 'title' to an empty string if it doesn't exist
-        record.title = getattr(record, "title", "")
-
+            record.title_color = getattr(record, "title")
         if hasattr(record, "msg"):
             record.message_no_color = remove_color_codes(getattr(record, "msg"))
         else:
@@ -246,10 +216,12 @@ logger = Logger()
 
 def print_assistant_thoughts(
     ai_name: object,
-    assistant_reply_json_valid: object
+    assistant_reply_json_valid: object,
+    speak_mode: bool = False,
 ) -> None:
     assistant_thoughts_reasoning = None
     assistant_thoughts_plan = None
+    assistant_thoughts_speak = None
     assistant_thoughts_criticism = None
 
     assistant_thoughts = assistant_reply_json_valid.get("thoughts", {})
@@ -258,6 +230,7 @@ def print_assistant_thoughts(
         assistant_thoughts_reasoning = assistant_thoughts.get("reasoning")
         assistant_thoughts_plan = assistant_thoughts.get("plan")
         assistant_thoughts_criticism = assistant_thoughts.get("criticism")
+        assistant_thoughts_speak = assistant_thoughts.get("speak")
     logger.typewriter_log(
         f"{ai_name.upper()} THOUGHTS:", Fore.YELLOW, f"{assistant_thoughts_text}"
     )
@@ -276,3 +249,6 @@ def print_assistant_thoughts(
             line = line.lstrip("- ")
             logger.typewriter_log("- ", Fore.GREEN, line.strip())
     logger.typewriter_log("CRITICISM:", Fore.YELLOW, f"{assistant_thoughts_criticism}")
+    # Speak the assistant's thoughts
+    if speak_mode and assistant_thoughts_speak:
+        say_text(assistant_thoughts_speak)

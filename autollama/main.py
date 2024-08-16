@@ -21,6 +21,7 @@ def run_auto_llama(
     continuous_limit: int,
     ai_settings: str,
     skip_reprompt: bool,
+    speak: bool,
     debug: bool,
     memory_type: str,
     browser_name: str,
@@ -29,6 +30,7 @@ def run_auto_llama(
 ):
     # Configure logging before we do anything else.
     logger.set_level(logging.DEBUG if debug else logging.INFO)
+    logger.speak_mode = speak
 
     cfg = Config()
     # TODO: fill in llm values here
@@ -38,11 +40,11 @@ def run_auto_llama(
         continuous_limit,
         ai_settings,
         skip_reprompt,
+        speak,
         debug,
         memory_type,
         browser_name,
         allow_downloads,
-        workspace_directory
     )
 
 
@@ -69,15 +71,17 @@ def run_auto_llama(
     # Create a CommandRegistry instance and scan default folder
     command_registry = CommandRegistry()
     command_registry.import_commands("autollama.commands.analyze_code")
+    command_registry.import_commands("autollama.commands.audio_text")
     command_registry.import_commands("autollama.commands.execute_code")
     command_registry.import_commands("autollama.commands.file_operations")
     command_registry.import_commands("autollama.commands.git_operations")
     command_registry.import_commands("autollama.commands.google_search")
+    command_registry.import_commands("autollama.commands.image_gen")
     command_registry.import_commands("autollama.commands.improve_code")
+    command_registry.import_commands("autollama.commands.twitter")
     command_registry.import_commands("autollama.commands.web_selenium")
     command_registry.import_commands("autollama.commands.write_tests")
     command_registry.import_commands("autollama.app")
-    command_registry.import_commands("autollama.commands.task_statuses")
 
     ai_name = ""
     ai_config = construct_main_ai_config()
@@ -87,7 +91,6 @@ def run_auto_llama(
     full_message_history = []
     next_action_count = 0
 
-    
     # Initialize memory and make sure it is empty.
     # this is particularly important for indexing and referencing pinecone memory
     memory = get_memory(cfg, init=True)

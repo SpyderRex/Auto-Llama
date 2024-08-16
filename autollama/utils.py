@@ -20,7 +20,6 @@ from autollama.config import Config
 def clean_input(prompt: str = "", talk=False):
     try:
         cfg = Config()
-            
 
         # ask for input, default when just pressing Enter is y
         logger.info("Asking user via keyboard...")
@@ -59,17 +58,6 @@ def readable_file_size(size, decimal_places=2):
         size /= 1024.0
     return f"{size:.{decimal_places}f} {unit}"
 
-
-"""
-
-def get_current_git_branch() -> str:
-    try:
-        repo = Repo(search_parent_directories=True)
-        branch = repo.active_branch
-        return branch.name
-    except:
-        return ""
-"""
 
 
 def markdown_to_ansi_style(markdown: str):

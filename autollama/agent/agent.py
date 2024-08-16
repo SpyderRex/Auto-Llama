@@ -1,5 +1,3 @@
-from datetime import datetime
-import os
 from colorama import Fore, Style
 
 from autollama.app import execute_command, get_command
@@ -8,13 +6,8 @@ from autollama.json_utils.json_fix_llm import fix_json_using_multiple_techniques
 from autollama.json_utils.utilities import LLM_DEFAULT_RESPONSE_FORMAT, validate_json
 from autollama.llm import chat_with_ai, create_chat_completion, create_chat_message
 from autollama.llm.token_counter import count_string_tokens
-from autollama.log_cycle.log_cycle import (
-    FULL_MESSAGE_HISTORY_FILE_NAME,
-    NEXT_ACTION_FILE_NAME,
-    USER_INPUT_FILE_NAME,
-    LogCycleHandler,
-)
 from autollama.logs import logger, print_assistant_thoughts
+from autollama.speech import say_text
 from autollama.spinner import Spinner
 from autollama.utils import clean_input
 from autollama.workspace import Workspace
@@ -65,7 +58,7 @@ class Agent:
         self.ai_name = ai_name
         self.memory = memory
         self.summary_memory = (
-            "I was created."  # Initial memory necessary to avoid hallucination
+            "I was created."  # Initial memory necessary to avoid hilucination
         )
         self.last_memory_index = 0
         self.full_message_history = full_message_history
@@ -75,49 +68,37 @@ class Agent:
         self.system_prompt = system_prompt
         self.triggering_prompt = triggering_prompt
         self.workspace = Workspace(workspace_directory, cfg.restrict_to_workspace)
-        self.created_at = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.cycle_count = 0
-        self.log_cycle_handler = LogCycleHandler()
-        self.token_limit = cfg.token_limit
 
     def start_interaction_loop(self):
         # Interaction Loop
         cfg = Config()
-        self.cycle_count = 0
+        loop_count = 0
         command_name = None
         arguments = None
         user_input = ""
 
         while True:
             # Discontinue if continuous limit is reached
-            self.cycle_count += 1
-            self.log_cycle_handler.log_count_within_cycle = 0
-            self.log_cycle_handler.log_cycle(
-                self.config.ai_name,
-                self.created_at,
-                self.cycle_count,
-                self.full_message_history,
-                FULL_MESSAGE_HISTORY_FILE_NAME,
-            )
+            loop_count += 1
             if (
                 cfg.continuous_mode
                 and cfg.continuous_limit > 0
-                and self.cycle_count > cfg.continuous_limit
+                and loop_count > cfg.continuous_limit
             ):
                 logger.typewriter_log(
                     "Continuous Limit Reached: ", Fore.YELLOW, f"{cfg.continuous_limit}"
                 )
                 break
             # Send message to AI, get response
-            with Spinner("Reasoning... "):
+            with Spinner("Thinking... "):
                 assistant_reply = chat_with_ai(
                     self,
                     self.system_prompt,
                     self.triggering_prompt,
                     self.full_message_history,
                     self.memory,
-                    self.token_limit
-                    )  # TODO: This hardcodes the model to use GPT3.5. Make this an argument
+                    cfg.token_limit,
+                )  # TODO: This hardcodes the model to use GPT3.5. Make this an argument
 
             assistant_reply_json = fix_json_using_multiple_techniques(assistant_reply)
 
@@ -127,21 +108,16 @@ class Agent:
                 # Get command name and arguments
                 try:
                     print_assistant_thoughts(
-                        self.ai_name, assistant_reply_json
+                        self.ai_name, assistant_reply_json, cfg.speak_mode
                     )
                     command_name, arguments = get_command(assistant_reply_json)
+                    if cfg.speak_mode:
+                        say_text(f"I want to execute {command_name}")
 
                     arguments = self._resolve_pathlike_command_args(arguments)
 
                 except Exception as e:
                     logger.error("Error: \n", str(e))
-            self.log_cycle_handler.log_cycle(
-                self.config.ai_name,
-                self.created_at,
-                self.cycle_count,
-                assistant_reply_json,
-                NEXT_ACTION_FILE_NAME,
-            )
 
             if not cfg.continuous_mode and self.next_action_count == 0:
                 # ### GET USER AUTHORIZATION TO EXECUTE COMMAND ###
@@ -156,7 +132,7 @@ class Agent:
                 )
 
                 logger.info(
-                    "Enter 'y' to authorise command, 'y -N' to run N continuous commands, 's' to run self-feedback commands or "
+                    "Enter 'y' to authorise command, 'y -N' to run N continuous commands, 's' to run self-feedback commands"
                     "'n' to exit program, or enter feedback for "
                     f"{self.ai_name}..."
                 )
@@ -178,15 +154,17 @@ class Agent:
                         )
                         thoughts = assistant_reply_json.get("thoughts", {})
                         self_feedback_resp = self.get_self_feedback(
-                            thoughts, cfg.llama_ai_model
+                            thoughts, cfg.llm_model
                         )
                         logger.typewriter_log(
                             f"SELF FEEDBACK: {self_feedback_resp}",
                             Fore.YELLOW,
                             "",
                         )
-                        user_input = self_feedback_resp
-                        command_name = "self_feedback"
+                        if self_feedback_resp[0].lower().strip() == cfg.authorise_key:
+                            user_input = "GENERATE NEXT COMMAND JSON"
+                        else:
+                            user_input = self_feedback_resp
                         break
                     elif console_input.lower().strip() == "":
                         logger.warn("Invalid input format.")
@@ -210,13 +188,6 @@ class Agent:
                     else:
                         user_input = console_input
                         command_name = "human_feedback"
-                        self.log_cycle_handler.log_cycle(
-                            self.config.ai_name,
-                            self.created_at,
-                            self.cycle_count,
-                            user_input,
-                            USER_INPUT_FILE_NAME,
-                        )
                         break
 
                 if user_input == "GENERATE NEXT COMMAND JSON":
@@ -244,8 +215,6 @@ class Agent:
                 )
             elif command_name == "human_feedback":
                 result = f"Human feedback: {user_input}"
-            elif command_name == "self_feedback":
-                result = f"Self feedback: {user_input}"
             else:
                 command_result = execute_command(
                     self.command_registry,
@@ -256,10 +225,10 @@ class Agent:
                 result = f"Command {command_name} returned: " f"{command_result}"
 
                 result_tlength = count_string_tokens(
-                    str(command_result)
+                    str(command_result), cfg.llm_model
                 )
                 memory_tlength = count_string_tokens(
-                    str(self.summary_memory)
+                    str(self.summary_memory), cfg.llm_model
                 )
                 if result_tlength + memory_tlength + 600 > cfg.token_limit:
                     result = f"Failure: command {command_name} returned too much output. \
@@ -306,11 +275,12 @@ class Agent:
         """
         ai_role = self.config.ai_role
 
-        feedback_prompt = f"Below is a message from me, an AI Agent, assuming the role of {ai_role}. whilst keeping knowledge of my slight limitations as an AI Agent Please evaluate my thought process, reasoning, and plan, and provide a concise paragraph outlining potential improvements. Consider adding or removing ideas that do not align with my role and explaining why, prioritizing thoughts based on their significance, or simply refining my overall thought process."
+        feedback_prompt = f"Below is a message from an AI agent with the role of {ai_role}. Please review the provided Thought, Reasoning, Plan, and Criticism. If these elements accurately contribute to the successful execution of the assumed role, respond with the letter 'Y' followed by a space, and then explain why it is effective. If the provided information is not suitable for achieving the role's objectives, please provide one or more sentences addressing the issue and suggesting a resolution."
         reasoning = thoughts.get("reasoning", "")
         plan = thoughts.get("plan", "")
         thought = thoughts.get("thoughts", "")
-        feedback_thoughts = thought + reasoning + plan
+        criticism = thoughts.get("criticism", "")
+        feedback_thoughts = thought + reasoning + plan + criticism
         return create_chat_completion(
             [{"role": "user", "content": feedback_prompt + feedback_thoughts}],
             llm_model,

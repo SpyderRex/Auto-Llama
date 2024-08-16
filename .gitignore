@@ -5,7 +5,7 @@ __pycache__/
 .env
 
 # Ignore the virtual environment directory
-autollamaenv/
+llamaenv/
 
 # Ignore logs directory
 logs/
