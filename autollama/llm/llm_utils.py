@@ -15,6 +15,7 @@ from autollama.llm.base import Message
 from autollama.logs import logger
 
 CFG = Config()
+nlp = spacy.load(CFG.embedding_model)  # Load Spacy model once at the beginning
 
 
 def retry_api(
@@ -31,7 +32,7 @@ def retry_api(
     """
     retry_limit_msg = f"{Fore.RED}Error: " f"Reached rate limit, passing...{Fore.RESET}"
     api_key_error_msg = (
-        f"Please double check that you have setup a valid API Account."
+        f"Please double-check that you have set up a valid API Account."
     )
     backoff_msg = (
         f"{Fore.RED}Error: API Bad gateway. Waiting {{backoff}} seconds...{Fore.RESET}"
@@ -97,8 +98,6 @@ def call_ai_function(
     return create_chat_completion(messages=messages, temperature=0)
 
 
-# Overly simple abstraction until we create something better
-# simple retry mechanism when getting a rate error or a bad gateway
 def create_chat_completion(
     messages: List[Message],  # type: ignore
     model=CFG.llm_model,
@@ -128,7 +127,7 @@ def create_chat_completion(
     api_manager = ApiManager()
     response = None
     for attempt in range(num_retries):
-        backoff = 2 ** (attempt + 2)
+        ackoff = 2 ** (attempt + 2)
         try:
             response = api_manager.create_chat_completion(
                 model=CFG.llm_model,
@@ -143,7 +142,7 @@ def create_chat_completion(
             )
             if not warned_user:
                 logger.double_check(
-                    f"Please double check your API configuration."
+                    f"Please double-check your API configuration."
                 )
                 warned_user = True
         logger.debug(
@@ -194,29 +193,25 @@ def get_spacy_embedding(text: str) -> List[float]:
     Returns:
         List[float]: The embedding.
     """
-    model = CFG.embedding_model
     text = text.replace("\n", " ")
 
-    embedding = create_embedding(text, model=model)
+    embedding = create_embedding(text)
     return embedding
 
 
 @retry_api()
 def create_embedding(
     text: str,
-    model=CFG.embedding_model,
     **kwargs,
 ) -> List[float]:
     """Create an embedding using Spacy.
 
     Args:
         text (str): The text to embed.
-        model (str, optional): The model to use. Defaults to None.
 
     Returns:
         List[float]: The embedding.
     """
-    nlp = spacy.load(CFG.embedding_model)
     doc = nlp(text)
     embedding = doc.vector.tolist()
-    return embedding 
+    return embedding

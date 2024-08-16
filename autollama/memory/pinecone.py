@@ -1,7 +1,7 @@
 import pinecone
 from colorama import Fore, Style
 
-from autollama.llm import get_ada_embedding
+from autollama.llm import get_spacy_embedding
 from autollama.logs import logger
 from autollama.memory.base import MemoryProviderSingleton
 
@@ -14,7 +14,7 @@ class PineconeMemory(MemoryProviderSingleton):
         dimension = 1536
         metric = "cosine"
         pod_type = "p1"
-        table_name = "auto-gpt"
+        table_name = "auto-llama"
         # this assumes we don't start with memory.
         # for now this works.
         # we'll need a more complicated and robust system if we want to start with
@@ -31,9 +31,6 @@ class PineconeMemory(MemoryProviderSingleton):
             )
             logger.double_check(
                 "Please ensure you have setup and configured Pinecone properly for use."
-                + f"You can check out {Fore.CYAN + Style.BRIGHT}"
-                "https://github.com/Torantulino/Auto-GPT#-pinecone-api-key-setup"
-                f"{Style.RESET_ALL} to ensure you've set up everything correctly."
             )
             exit(1)
 
@@ -47,7 +44,7 @@ class PineconeMemory(MemoryProviderSingleton):
         self.index = pinecone.Index(table_name)
 
     def add(self, data):
-        vector = get_ada_embedding(data)
+        vector = get_spacy_embedding(data)
         # no metadata here. We may wish to change that long term.
         self.index.upsert([(str(self.vec_num), vector, {"raw_text": data})])
         _text = f"Inserting data into memory at index: {self.vec_num}:\n data: {data}"
@@ -67,7 +64,7 @@ class PineconeMemory(MemoryProviderSingleton):
         :param data: The data to compare to.
         :param num_relevant: The number of relevant data to return. Defaults to 5
         """
-        query_embedding = get_ada_embedding(data)
+        query_embedding = get_spacy_embedding(data)
         results = self.index.query(
             query_embedding, top_k=num_relevant, include_metadata=True
         )
