@@ -3,7 +3,7 @@ import logging
 
 from autollama.commands.file_operations import ingest_file, list_files
 from autollama.config import Config
-from autollama.memory import get_memory
+from autollama.memory.vector import VectorMemory, get_memory
 
 cfg = Config()
 
@@ -21,14 +21,14 @@ def configure_logging():
     return logging.getLogger("AutoLlama-Ingestion")
 
 
-def ingest_directory(directory, memory, args):
+def ingest_directory(directory: str, memory: VectorMemory, args):
     """
     Ingest all files in a directory by calling the ingest_file function for each file.
 
     :param directory: The directory containing the files to ingest
     :param memory: An object with an add() method to store the chunks in memory
     """
-    global logger
+    logger = logging.getLogger("AutoLlama-Ingestion")
     try:
         files = list_files(directory)
         for file in files:
@@ -88,7 +88,7 @@ def main() -> None:
     else:
         logger.warn(
             "Please provide either a file path (--file) or a directory name (--dir)"
-            " inside the auto_gpt_workspace directory as input."
+            " inside the auto_llama_workspace directory as input."
         )
 
 

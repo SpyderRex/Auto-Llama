@@ -3,8 +3,11 @@ import importlib
 import inspect
 from typing import Any, Callable, Optional
 
-# Unique identifier for auto-gpt commands
-AUTO_GPT_COMMAND_IDENTIFIER = "auto_gpt_command"
+from autollama.config import Config
+from autollama.logs import logger
+
+# Unique identifier for auto-llama commands
+AUTO_LLAMA_COMMAND_IDENTIFIER = "auto_llama_command"
 
 
 class Command:
@@ -22,19 +25,23 @@ class Command:
         description: str,
         method: Callable[..., Any],
         signature: str = "",
-        enabled: bool = True,
+        enabled: bool | Callable[[Config], bool] = True,
         disabled_reason: Optional[str] = None,
     ):
         self.name = name
         self.description = description
         self.method = method
-        self.signature = signature if signature else str(inspect.signature(self.method))
+        self.signature = signature
         self.enabled = enabled
         self.disabled_reason = disabled_reason
 
     def __call__(self, *args, **kwargs) -> Any:
+        if hasattr(kwargs, "config") and callable(self.enabled):
+            self.enabled = self.enabled(kwargs["config"])
         if not self.enabled:
-            return f"Command '{self.name}' is disabled: {self.disabled_reason}"
+            if self.disabled_reason:
+                return f"Command '{self.name}' is disabled: {self.disabled_reason}"
+            return f"Command '{self.name}' is disabled"
         return self.method(*args, **kwargs)
 
     def __str__(self) -> str:
@@ -44,9 +51,7 @@ class Command:
 class CommandRegistry:
     """
     The CommandRegistry class is a manager for a collection of Command objects.
-    It allows the registration, modification, and retrieval of Command objects,
-    as well as the scanning and loading of command plugins from a specified
-    directory.
+    It allows the registration, modification, and retrieval of Command objects.
     """
 
     def __init__(self):
@@ -59,6 +64,10 @@ class CommandRegistry:
         return importlib.reload(module)
 
     def register(self, cmd: Command) -> None:
+        if cmd.name in self.commands:
+            logger.warn(
+                f"Command '{cmd.name}' already registered and will be overwritten!"
+            )
         self.commands[cmd.name] = cmd
 
     def unregister(self, command_name: str):
@@ -99,7 +108,7 @@ class CommandRegistry:
         Imports the specified Python module containing command plugins.
 
         This method imports the associated module and registers any functions or
-        classes that are decorated with the `AUTO_GPT_COMMAND_IDENTIFIER` attribute
+        classes that are decorated with the `AUTO_LLAMA_COMMAND_IDENTIFIER` attribute
         as `Command` objects. The registered `Command` objects are then added to the
         `commands` dictionary of the `CommandRegistry` object.
 
@@ -112,8 +121,8 @@ class CommandRegistry:
         for attr_name in dir(module):
             attr = getattr(module, attr_name)
             # Register decorated functions
-            if hasattr(attr, AUTO_GPT_COMMAND_IDENTIFIER) and getattr(
-                attr, AUTO_GPT_COMMAND_IDENTIFIER
+            if hasattr(attr, AUTO_LLAMA_COMMAND_IDENTIFIER) and getattr(
+                attr, AUTO_LLAMA_COMMAND_IDENTIFIER
             ):
                 self.register(attr.command)
             # Register command classes
@@ -127,11 +136,21 @@ class CommandRegistry:
 def command(
     name: str,
     description: str,
-    signature: str = "",
-    enabled: bool = True,
+    signature: str,
+    enabled: bool | Callable[[Config], bool] = True,
     disabled_reason: Optional[str] = None,
 ) -> Callable[..., Any]:
     """The command decorator is used to create Command objects from ordinary functions."""
+
+    # TODO: Remove this in favor of better command management
+    CFG = Config()
+
+    if callable(enabled):
+        enabled = enabled(CFG)
+    if not enabled:
+        if disabled_reason is not None:
+            logger.debug(f"Command '{name}' is disabled: {disabled_reason}")
+        return lambda func: func
 
     def decorator(func: Callable[..., Any]) -> Command:
         cmd = Command(
@@ -149,7 +168,7 @@ def command(
 
         wrapper.command = cmd
 
-        setattr(wrapper, AUTO_GPT_COMMAND_IDENTIFIER, True)
+        setattr(wrapper, AUTO_LLAMA_COMMAND_IDENTIFIER, True)
 
         return wrapper
 

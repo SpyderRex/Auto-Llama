@@ -2,7 +2,7 @@
 import threading
 from threading import Semaphore
 
-from autollama.config import Config
+from autollama.config.config import Config
 from autollama.speech.base import VoiceBase
 from autollama.speech.brian import BrianSpeech
 from autollama.speech.eleven_labs import ElevenLabsSpeech

@@ -1,23 +1,32 @@
 from __future__ import annotations
 
+from typing import List, Optional
+
 from groq import Groq
 
 from autollama.config import Config
+from autollama.llm.base import MessageDict
+from autollama.llm.modelsinfo import COSTS
 from autollama.logs import logger
 from autollama.singleton import Singleton
+
 
 class ApiManager(metaclass=Singleton):
     def __init__(self):
         self.total_prompt_tokens = 0
         self.total_completion_tokens = 0
+        self.total_cost = 0
+        self.models: Optional[list[Model]] = None
 
     def reset(self):
         self.total_prompt_tokens = 0
         self.total_completion_tokens = 0
+        self.total_cost = 0
+        self.models = None
 
     def create_chat_completion(
         self,
-        messages: list,  # type: ignore
+        messages: list[MessageDict],
         model: str | None = None,
         temperature: float = None,
         max_tokens: int | None = None,
@@ -36,18 +45,38 @@ class ApiManager(metaclass=Singleton):
         client = Groq(api_key=cfg.groq_api_key)
         if temperature is None:
             temperature = cfg.temperature
-
+      
         response = client.chat.completions.create(
-            model=cfg.llm_model,
+            model=model,
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens,
         )
-        logger.debug(f"Response: {response}")
-        prompt_tokens = response.usage.prompt_tokens
-        completion_tokens = response.usage.completion_tokens
-
+        if not hasattr(response, "error"):
+            logger.debug(f"Response: {response}")
+            prompt_tokens = response.usage.prompt_tokens
+            completion_tokens = response.usage.completion_tokens
+            self.update_cost(prompt_tokens, completion_tokens, model)
         return response
+
+    def update_cost(self, prompt_tokens, completion_tokens, model: str):
+        """
+        Update the total cost, prompt tokens, and completion tokens.
+
+        Args:
+        prompt_tokens (int): The number of tokens used in the prompt.
+        completion_tokens (int): The number of tokens used in the completion.
+        model (str): The model used for the API call.
+        """
+        model = model[:-3] if model.endswith("-v2") else model
+
+        self.total_prompt_tokens += prompt_tokens
+        self.total_completion_tokens += completion_tokens
+        self.total_cost += (
+            prompt_tokens * COSTS[model]["prompt"]
+            + completion_tokens * COSTS[model]["completion"]
+        ) / 1000
+        logger.debug(f"Total running cost: ${self.total_cost:.3f}")
 
 
     def get_total_prompt_tokens(self):
@@ -67,3 +96,25 @@ class ApiManager(metaclass=Singleton):
         int: The total number of completion tokens.
         """
         return self.total_completion_tokens
+
+    def get_total_cost(self):
+        """
+        Get the total cost of API calls.
+
+        Returns:
+        float: The total cost of API calls.
+        """
+        return self.total_cost
+
+
+    def get_models(self) -> List[Model]:
+        """
+        Get list of available Llama models.
+
+        Returns:
+        list: List of available Llama models.
+
+        """
+        if self.models is None:
+            all_models = ["llama3-8b-8192"]
+        return self.models

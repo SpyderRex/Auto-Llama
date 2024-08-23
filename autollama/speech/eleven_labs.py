@@ -4,7 +4,7 @@ import os
 import requests
 from playsound import playsound
 
-from autollama.config import Config
+from autollama.config.config import Config
 from autollama.speech.base import VoiceBase
 
 PLACEHOLDERS = {"your-voice-id"}
@@ -69,7 +69,7 @@ class ElevenLabsSpeech(VoiceBase):
         Returns:
             bool: True if the request was successful, False otherwise
         """
-        from autollama.logs import logger
+        from autogpt.logs import logger
 
         tts_url = (
             f"https://api.elevenlabs.io/v1/text-to-speech/{self._voices[voice_index]}"

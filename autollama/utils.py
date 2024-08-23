@@ -4,23 +4,23 @@ import re
 import requests
 import yaml
 from colorama import Fore, Style
-from git.repo import Repo
-
-from autollama.logs import logger
-
-# Use readline if available (for clean_input)
-try:
-    import readline
-except ImportError:
-    pass
 
 from autollama.config import Config
+from autollama.logs import logger
+
+
+def batch(iterable, max_batch_length: int, overlap: int = 0):
+    """Batch data from iterable into slices of length N. The last batch may be shorter."""
+    # batched('ABCDEFG', 3) --> ABC DEF G
+    if max_batch_length < 1:
+        raise ValueError("n must be at least one")
+    for i in range(0, len(iterable), max_batch_length - overlap):
+        yield iterable[i : i + max_batch_length]
 
 
 def clean_input(prompt: str = "", talk=False):
     try:
-        cfg = Config()
-
+        cfg = Config()      
         # ask for input, default when just pressing Enter is y
         logger.info("Asking user via keyboard...")
         answer = input(prompt)
@@ -57,7 +57,6 @@ def readable_file_size(size, decimal_places=2):
             break
         size /= 1024.0
     return f"{size:.{decimal_places}f} {unit}"
-
 
 
 def markdown_to_ansi_style(markdown: str):
